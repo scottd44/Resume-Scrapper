@@ -1,0 +1,1 @@
+# The file /smart-job-filter/smart-job-filter/src/ai/__init__.py is intentionally left blank.

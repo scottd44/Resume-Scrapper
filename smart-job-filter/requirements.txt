@@ -1,0 +1,7 @@
+requests
+beautifulsoup4
+torch
+pandas
+scikit-learn
+numpy
+streamlit
