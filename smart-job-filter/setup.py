@@ -13,7 +13,7 @@ setup(
         'torch',
         'numpy',
         'pandas',
-        'scikit-learn'
+        'scikit-learn',
         'streamlit'
     ],
     entry_points={
