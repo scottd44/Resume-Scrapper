@@ -27,7 +27,6 @@ class JobScraper:
         options = uc.ChromeOptions()
         options.add_argument(f"user-agent={random.choice(self.USER_AGENTS)}")
 
-
         try:
             self.driver = uc.Chrome(options=options)
             time.sleep(2)
@@ -47,14 +46,14 @@ class JobScraper:
         search_url = f"{self.base_url}/jobs?q={job_title}&l={location}" # This allows the user to input their desired job type and location. it will then be searched for on job site
         try:
             self.driver.get(search_url)
-            time.sleep(random.uniform(7,9))  # Wait for JavaScript content for 3-6 seconds to load (randomized to mimic human behavior)
+            time.sleep(random.uniform(2,4))  # Wait for JavaScript content for 3-6 seconds to load (randomized to mimic human behavior)
 
             if "Just a moment" in self.driver.title:
                 print("CloudFlare detected - waiting...")
                 time.sleep(10) # Wait for CloudFlare to bypass
 
             # Wait for job cards to appear
-            WebDriverWait(self.driver, 5).until(
+            WebDriverWait(self.driver, 2).until(
                 EC.presence_of_element_located((By.CLASS_NAME, "job_seen_beacon"))
         )
 
@@ -83,28 +82,26 @@ class JobScraper:
             location = card.find_element(By.CSS_SELECTOR, "[data-testid='text-location']").text
             
             # Now click for description
-            title_element = card.find_element(By.CLASS_NAME, "jcs-JobTitle")
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", title_element)
-            time.sleep(2)
-            self.driver.execute_script("arguments[0].click();", title_element)
-            
-            # Wait for description
-            description_element = WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located((By.CLASS_NAME, "jobsearch-JobComponent-description"))
+            title_element = WebDriverWait(card, 10).until(
+                EC.element_to_be_clickable((By.CLASS_NAME, "jcs-JobTitle")) 
             )
+            self.driver.execute_script("arguments[0].click();", title_element)
 
-            # Simple scroll to ensure visibility
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", description_element)
-            time.sleep(2)
-            
-            # Extract full text
-            full_description = description_element.get_attribute('innerText')
+            time.sleep(random.uniform(.5,1))  # Wait for the job description to load
+
+            # Get full job description
+            full_description = []
+
+            try:
+                full_description.append(self.driver.find_element(By.ID, "jobDescriptionText").text)
+            except:
+                full_description.append("No description available")
             
             job = {
                 'title': title or "No title available",
                 'company': company or "Unkown company",
                 'location': location or "Location not specified",
-                'description': full_description,
+                'description': "\n".join(full_description).strip(),
                 'url': self.driver.current_url
             }
             return job
@@ -125,17 +122,17 @@ if __name__ == "__main__": # used to test scrapper
         print("Searching for Java developer jobs...")
         
         # Search for jobs
-        jobs = scraper.search_jobs("finance intern", "Atlanta, GA")
+        jobs = scraper.search_jobs("software engineer", "New York")
         
         # Display results
         print(f"\nFound {len(jobs)} jobs:")
         for job in jobs:
             print("\n" + "="*50)
-            print(f"Title: {job['title']}")
-            print(f"Company: {job['company']}")
-            print(f"Location: {job['location']}")
-            print(f"URL: {job['url']}")
-            print(f"Description: {job['description'][:200]}...")
+            print(f"Title: {job['title']}\n")
+            print(f"Company: {job['company']}\n")
+            print(f"Location: {job['location']}\n")
+            print(f"URL: {job['url']}\n")
+            print(f"Description: {job['description']}")
             print("="*50)
             
     except Exception as e:
