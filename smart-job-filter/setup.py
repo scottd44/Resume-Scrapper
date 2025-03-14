@@ -8,13 +8,14 @@ setup(
     packages=find_packages(where='src'),
     package_dir={'': 'src'},
     install_requires=[
-        'requests',
+        'requests', # might not use
         'beautifulsoup4',
         'torch',
         'numpy',
         'pandas',
         'scikit-learn',
-        'streamlit'
+        'streamlit',
+        'selenium'
     ],
     entry_points={
         'console_scripts': [

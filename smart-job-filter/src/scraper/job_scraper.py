@@ -1,9 +1,11 @@
-import requests # for making HTTP requests
+from selenium import webdriver  # Imports Selenium's WebDriver to automate web browsing.
+from selenium.webdriver.chrome.service import Service  # Manages ChromeDriver execution as a background service.
+from selenium.webdriver.chrome.options import Options  # Allows customization of Chrome's behavior, such as headless mode.
+from webdriver_manager.chrome import ChromeDriverManager  # Automatically downloads and manages the correct version of ChromeDriver.
 from bs4 import BeautifulSoup # for parsing HTML - connects beautifulsoup4
 import random # for generating agent for scraping
 from urllib.parse import urljoin # this is to used to correctly join base URLs with relative paths.
 import time # for adding delay between requests
-
 
 
 class JobScraper:
@@ -18,30 +20,32 @@ class JobScraper:
         """
         Initialize the job scraper
         - base_url: The main website we're scraping from
-        - headers: To make our requests look like they're from a browser (using randomly selected agent)
         """
         self.base_url = "https://www.indeed.com"
-        self.headers = {
-            'User-Agent': random.choice(self.USER_AGENTS),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive'
-            # These headers help make the scraper appear as a real browser by specifying accepted content types, 
-            # preferred language, supported compression methods, and maintaining an open connection for efficiency.
-        }
+        self.options = Options() # create an instance of the Options class
+        self.options.add_argument("--headless") # run the browser in headless mode
+        self.options.add_argument(f"user-agent={random.choice(self.USER_AGENTS)}") # set a random user agent
+        self.driver = webdriver.Chrome(
+            service=Service(ChromeDriverManager().install()),
+            options=self.options
+        ) # create an instance of the Chrome driver
+
+    def __del__(self):
+         # Ensures that the WebDriver instance is properly closed when the object is deleted.
+        if hasattr(self, 'driver'): # Checks if the 'driver' attribute exists to avoid errors.
+            self.driver.quit() # Closes the browser and releases system resources.
+        
     
     def search_jobs(self, job_title: str, location: str) -> list:  #search_jobs method that takes in job_title a user wants and location as arguments and returns a list of job postings
 
-        search_jobs_url = f"{self.base_url}/jobs?q={job_title}&l={location}" # This allows the user to input their desired job type and location. it will then be searched for on job site
+        search_url = f"{self.base_url}/jobs?q={job_title}&l={location}" # This allows the user to input their desired job type and location. it will then be searched for on job site
         try:
-            time.sleep(random.uniform(1, 3)) # adds random dalay between requests
-            response = requests.get(search_jobs_url, headers=self.headers) # sends a request for the the job posting, uses headers to make it look like it's coming from a browser (randomly selected agent)
-            response.raise_for_status() # raises an exception if the response is not successful
-            return self._parse_search_results(response.text) # returns the parsed search results using method _parse_search_results defined below.
-        except requests.RequestException as e:
-            print(f"Error searching for jobs: {e}")
-            return [] # returns an empty list if there is an error instead of nothing which could crash the program.
+            self.driver.get(search_url)
+            time.sleep(3)  # Wait for JavaScript content
+            return self._parse_search_results(self.driver.page_source)
+        except Exception as e:
+            print(f"Error fetching job listings: {e}")
+            return []
         
     def _parse_search_results(self, html: str) -> list: # method to parse the search results takes in html which was made in the search_jobs method.
         """
@@ -85,20 +89,32 @@ class JobScraper:
 
         return jobs # returns the list of job postings
     
-if __name__ == "__main__":
+if __name__ == "__main__": # used to test scrapper
+    # Initialize scraper
     scraper = JobScraper()
-    print("Testing job scraper...")
-    jobs = scraper.search_jobs("python developer", "remote")
     
-    print(f"\nFound {len(jobs)} jobs:")
-    for job in jobs:
-        print(f"\nTitle: {job['title']}")
-        print(f"Company: {job['company']}")
-        print(f"Location: {job['location']}")
-        print(f"URL: {job['url']}")
-        print("-" * 50)
-
-
-
-    
+    try:
+        # Test the scraper
+        print("Testing job scraper...")
+        print("Searching for Java developer jobs...")
+        
+        # Search for jobs
+        jobs = scraper.search_jobs("Software Engineer", "Atlanta, GA")
+        
+        # Display results
+        print(f"\nFound {len(jobs)} jobs:")
+        for job in jobs:
+            print("\n" + "="*50)
+            print(f"Title: {job['title']}")
+            print(f"Company: {job['company']}")
+            print(f"Location: {job['location']}")
+            print(f"URL: {job['url']}")
+            print(f"Description: {job['description'][:200]}...")
+            print("="*50)
+            
+    except Exception as e:
+        print(f"Error running scraper: {e}")
+    finally:
+        # Ensure browser is closed
+        scraper.driver.quit()
     
