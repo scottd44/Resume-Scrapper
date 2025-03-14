@@ -25,7 +25,6 @@ class JobScraper:
         """
         self.base_url = "https://www.indeed.com"
         options = uc.ChromeOptions()
-        options.add_argument("start-maximized")
         options.add_argument(f"user-agent={random.choice(self.USER_AGENTS)}")
 
 
@@ -48,7 +47,11 @@ class JobScraper:
         search_url = f"{self.base_url}/jobs?q={job_title}&l={location}" # This allows the user to input their desired job type and location. it will then be searched for on job site
         try:
             self.driver.get(search_url)
-            time.sleep(random.uniform(3,6))  # Wait for JavaScript content for 5-10 seconds to load (randomized to mimic human behavior)
+            time.sleep(random.uniform(7,9))  # Wait for JavaScript content for 3-6 seconds to load (randomized to mimic human behavior)
+
+            if "Just a moment" in self.driver.title:
+                print("CloudFlare detected - waiting...")
+                time.sleep(10) # Wait for CloudFlare to bypass
 
             # Wait for job cards to appear
             WebDriverWait(self.driver, 5).until(
@@ -61,45 +64,56 @@ class JobScraper:
             return []
         
     def _parse_search_results(self, html: str) -> list: # method to parse the search results takes in html which was made in the search_jobs method.
-        """
-        Parse the search results page and return a list of job postings
-        - html: The HTML content of the search results page
-        - returns: A list of job dics
-        """
-        soup = BeautifulSoup(html, 'html.parser') # parse the html content using beautifulsoup
-        jobs = [] # empty list to store the job postings 
+        jobs = []
+        job_cards = self.driver.find_elements(By.CLASS_NAME, "job_seen_beacon")
+        print(f"Found {len(job_cards)} job cards.")
 
-        # Finds all job listing containers on the page.
-        # Each job listing is inside a <div> element with class "job_seen_beacon".
-        # This is specific to Indeed's HTML structure and may change in the future!!!
-        job_cards = soup.find_all('div', class_='job_seen_beacon') # find all the job postings on the page
-
-        for card in job_cards:
+        for index, card in enumerate(job_cards): # Loop through each job card from the search results  
+            job = self._get_job_details(card)
+            if job:
+                jobs.append(job)
+            print(f"Processed job card {index + 1}/{len(job_cards)}")
+        return jobs
+    
+    def _get_job_details(self, card, max_retries = 3) -> dict:
+        """Get basic info first from the job card , then click for full description"""
+        try:
+            title = card.find_element(By.CSS_SELECTOR, "[class*='jobTitle']").text
+            company = card.find_element(By.CSS_SELECTOR, "[data-testid='company-name']").text
+            location = card.find_element(By.CSS_SELECTOR, "[data-testid='text-location']").text
             
-            try:
-                job = {
-                    'title': card.find('h2', class_='jobTitle').get_text(strip=True) if card.find('h2') else "No title",
-                    # Extracts job title; defaults to "No title" if missing.
+            # Now click for description
+            title_element = card.find_element(By.CLASS_NAME, "jcs-JobTitle")
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", title_element)
+            time.sleep(2)
+            self.driver.execute_script("arguments[0].click();", title_element)
+            
+            # Wait for description
+            description_element = WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "jobsearch-JobComponent-description"))
+            )
 
-                    'company': card.find('span', class_='companyName').get_text(strip=True) if card.find('span', class_='companyName') else "Unknown company",
-                    # Extracts company name; defaults to "Unknown company" if missing.
+            # Simple scroll to ensure visibility
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", description_element)
+            time.sleep(2)
+            
+            # Extract full text
+            full_description = description_element.get_attribute('innerText')
+            
+            job = {
+                'title': title or "No title available",
+                'company': company or "Unkown company",
+                'location': location or "Location not specified",
+                'description': full_description,
+                'url': self.driver.current_url
+            }
+            return job
+                
+        except Exception as e:
+            print(f"Error getting job details: {e}")
+            return None
+        
 
-                    'location': card.find('div', class_='companyLocation').get_text(strip=True) if card.find('div', class_='companyLocation') else "Location not specified",
-                    # Extracts job location; defaults to "Location not specified" if missing.
-
-                    'url': urljoin(self.base_url, card.find('a')['href']) if card.find('a') and card.find('a').has_attr('href') else None,
-                    # Extracts job URL; safely handles missing or relative links.
-
-                    'description': card.find('div', class_='job-snippet').get_text(strip=True) if card.find('div', class_='job-snippet') else "No description available"
-                    # Extracts job description; defaults to "No description available" if missing.
-                } # view indeeds HTML structure to understand how this works. 
-
-                jobs.append(job) # append the job to the list of jobs
-            except AttributeError as e:
-                print(f"Error parsing job listing: {e}")
-                continue # continue to the next job if there is an error parsing the current job
-
-        return jobs # returns the list of job postings
     
 if __name__ == "__main__": # used to test scrapper
     # Initialize scraper
@@ -129,4 +143,3 @@ if __name__ == "__main__": # used to test scrapper
     finally:
         # Ensure browser is closed
         scraper.driver.quit()
-    
