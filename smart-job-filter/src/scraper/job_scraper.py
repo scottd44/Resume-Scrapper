@@ -1,8 +1,10 @@
-from selenium import webdriver  # Imports Selenium's WebDriver to automate web browsing.
-from selenium.webdriver.chrome.service import Service  # Manages ChromeDriver execution as a background service.
-from selenium.webdriver.chrome.options import Options  # Allows customization of Chrome's behavior, such as headless mode.
-from webdriver_manager.chrome import ChromeDriverManager  # Automatically downloads and manages the correct version of ChromeDriver.
+from selenium import webdriver # for automating web browser interaction
+import undetected_chromedriver as uc # for bypassing bot detection
 from bs4 import BeautifulSoup # for parsing HTML - connects beautifulsoup4
+from selenium.webdriver.support.ui import WebDriverWait # for waiting until a condition is met
+from selenium.webdriver.support import expected_conditions as EC # for defining expected conditions
+from selenium.webdriver.common.by import By # for locating elements
+from selenium.webdriver.chrome.options import Options  # for setting Chrome options
 import random # for generating agent for scraping
 from urllib.parse import urljoin # this is to used to correctly join base URLs with relative paths.
 import time # for adding delay between requests
@@ -22,13 +24,18 @@ class JobScraper:
         - base_url: The main website we're scraping from
         """
         self.base_url = "https://www.indeed.com"
-        self.options = Options() # create an instance of the Options class
-        self.options.add_argument("--headless") # run the browser in headless mode
-        self.options.add_argument(f"user-agent={random.choice(self.USER_AGENTS)}") # set a random user agent
-        self.driver = webdriver.Chrome(
-            service=Service(ChromeDriverManager().install()),
-            options=self.options
-        ) # create an instance of the Chrome driver
+        options = uc.ChromeOptions()
+        options.add_argument("start-maximized")
+        options.add_argument(f"user-agent={random.choice(self.USER_AGENTS)}")
+
+
+        try:
+            self.driver = uc.Chrome(options=options)
+            time.sleep(2)
+        except Exception as e:
+            print(f"Error initializing WebDriver: {e}")
+            raise
+
 
     def __del__(self):
          # Ensures that the WebDriver instance is properly closed when the object is deleted.
@@ -41,7 +48,13 @@ class JobScraper:
         search_url = f"{self.base_url}/jobs?q={job_title}&l={location}" # This allows the user to input their desired job type and location. it will then be searched for on job site
         try:
             self.driver.get(search_url)
-            time.sleep(3)  # Wait for JavaScript content
+            time.sleep(random.uniform(3,6))  # Wait for JavaScript content for 5-10 seconds to load (randomized to mimic human behavior)
+
+            # Wait for job cards to appear
+            WebDriverWait(self.driver, 5).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "job_seen_beacon"))
+        )
+
             return self._parse_search_results(self.driver.page_source)
         except Exception as e:
             print(f"Error fetching job listings: {e}")
@@ -55,7 +68,6 @@ class JobScraper:
         """
         soup = BeautifulSoup(html, 'html.parser') # parse the html content using beautifulsoup
         jobs = [] # empty list to store the job postings 
-
 
         # Finds all job listing containers on the page.
         # Each job listing is inside a <div> element with class "job_seen_beacon".
@@ -99,7 +111,7 @@ if __name__ == "__main__": # used to test scrapper
         print("Searching for Java developer jobs...")
         
         # Search for jobs
-        jobs = scraper.search_jobs("Software Engineer", "Atlanta, GA")
+        jobs = scraper.search_jobs("finance intern", "Atlanta, GA")
         
         # Display results
         print(f"\nFound {len(jobs)} jobs:")
