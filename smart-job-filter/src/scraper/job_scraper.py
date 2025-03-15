@@ -87,7 +87,7 @@ class JobScraper:
             )
             self.driver.execute_script("arguments[0].click();", title_element)
 
-            time.sleep(random.uniform(.5,1))  # Wait for the job description to load
+            time.sleep(random.uniform(.75,1))  # Wait for the job description to load
 
             # Get full job description
             full_description = []
@@ -111,7 +111,7 @@ class JobScraper:
             return None
         
 
-    
+"""    
 if __name__ == "__main__": # used to test scrapper
     # Initialize scraper
     scraper = JobScraper()
@@ -122,7 +122,7 @@ if __name__ == "__main__": # used to test scrapper
         print("Searching for Java developer jobs...")
         
         # Search for jobs
-        jobs = scraper.search_jobs("software engineer", "New York")
+        jobs = scraper.search_jobs("software engineering", "seattle")
         
         # Display results
         print(f"\nFound {len(jobs)} jobs:")
@@ -140,3 +140,4 @@ if __name__ == "__main__": # used to test scrapper
     finally:
         # Ensure browser is closed
         scraper.driver.quit()
+        """
