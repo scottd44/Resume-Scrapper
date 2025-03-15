@@ -34,7 +34,6 @@ class JobScraper:
             print(f"Error initializing WebDriver: {e}")
             raise
 
-
     def __del__(self):
          # Ensures that the WebDriver instance is properly closed when the object is deleted.
         if hasattr(self, 'driver'): # Checks if the 'driver' attribute exists to avoid errors.

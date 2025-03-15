@@ -5,7 +5,7 @@ import spacy
 from typing import List, Dict, set
 import string
 
-class SkillAnalyzer:
+class SkillAnalyzer: # This class is used to analyze skills from resumes and job descriptions
     def __init__(self):
         """Initialize with advanced NLP capabilities"""
         # Load large language model for better accuracy
@@ -13,7 +13,7 @@ class SkillAnalyzer:
         self.matcher = Matcher(self.nlp.vocab)
         self._setup_skill_patterns()
 
-    def _setup_skill_patterns(self):
+    def _setup_skill_patterns(self): # define patterns for skill extraction
         """Define linguistic patterns that indicate skills"""
         skill_patterns = [
             # Experience patterns
@@ -43,7 +43,37 @@ class SkillAnalyzer:
         ]
         
         self.matcher.add("SKILL", skill_patterns)
-        
+
+    def extract_skills(self, text: str) -> List[Dict]: # extract skills from the text
+            """Extract skills with context and confidence"""
+            doc = self.nlp(self.clean_text(text))
+            skills = []
+            seen = set()
+            
+            # Get skills from pattern matches
+            matches = self.matcher(doc)
+            for match_id, start, end in matches:
+                span = doc[start:end]
+                if span.text not in seen:
+                    skills.append({
+                        'skill': span.text,
+                        'confidence': self._calculate_confidence(span),
+                        'context': self._get_context(span)
+                    })
+                    seen.add(span.text)
+                    
+            # Get skills from noun phrases
+            for chunk in doc.noun_chunks:
+                if chunk.text not in seen and self._is_likely_skill(chunk):
+                    skills.append({
+                        'skill': chunk.text,
+                        'confidence': self._calculate_confidence(chunk),
+                        'context': self._get_context(chunk)
+                    })
+                    seen.add(chunk.text)
+                    
+            return skills        
+
     def clean_text(self, text: str) -> str:
         """Clean the input text by removing special characters and converting to lowercase."""
         #convert to lowercase
