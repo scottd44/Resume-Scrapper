@@ -46,7 +46,7 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
 
     def extract_skills(self, text: str) -> List[Dict]: # extract skills from the text
             """Extract skills with context and confidence"""
-            doc = self.nlp(self.clean_text(text))
+            doc = self.nlp(text)
             skills = []
             seen = set()
             
@@ -73,30 +73,54 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
                     seen.add(chunk.text)
                     
             return skills        
+    def _calculate_confidence(self, span) -> float:
+        """Calculate confidence score for extracted skill"""
+        score = 0.5  # Base confidence
+        
+        # Increase confidence based on context
+        if any(token.pos_ in ["NOUN", "PROPN"] for token in span):
+            score += 0.2
+        if any(token.ent_type_ in ["PRODUCT", "ORG"] for token in span):
+            score += 0.2
+        if len(span) > 1:  # Multi-word skills more likely to be real
+            score += 0.1
+            
+        return min(1.0, score)
 
-    def clean_text(self, text: str) -> str:
-        """Clean the input text by removing special characters and converting to lowercase."""
-        #convert to lowercase
-        text = text.lower()
-        #remove punctuation
-        text = re.sub(f"[{re.escape(string.punctuation)}]", "", text)
-        #remove extra whitespace
-        return ' '.join(text.split())
     
     def calculate_match_score(self, resume_text: str, job_description: str) -> float:
-        """Calculate how well a resume matches a job description by taking in the resume text and job description as input and returning a match score."""
-        try:
-            # Clean the text
-            clean_resume = self.clean_text(resume_text)
-            clean_job = self.clean_text(job_description)
-
-            # Vectorize the text
-            tfidf_matrix = self.vectorizer.fit_transform([clean_resume, clean_job])
-
-            # calculate the cosine similarity score
-            return float(tfidf_matrix[0].dot(tfidf_matrix[1].T).toarray()[0][0])
-        except Exception as e:
-            print(f"Error calculating match score: {e}")
-            return 0.0
-    
+        """Calculate detailed match between resume and job"""
+        resume_skills = self.extract_skills(resume_text)
+        job_skills = self.extract_skills(job_description)
+        
+        matches = []
+        missing = []
+        total_confidence = 0
+        
+        for job_skill in job_skills:
+            matched = False
+            for resume_skill in resume_skills:
+                similarity = self.nlp(job_skill['skill']).similarity(
+                    self.nlp(resume_skill['skill'])
+                )
+                if similarity > 0.8:
+                    matches.append({
+                        'skill': job_skill['skill'],
+                        'confidence': resume_skill['confidence'],
+                        'similarity': similarity
+                    })
+                    matched = True
+                    total_confidence += resume_skill['confidence']
+                    break
+            if not matched:
+                missing.append(job_skill['skill'])
+        
+        match_score = total_confidence / len(job_skills) if job_skills else 0
+        
+        return {
+            'match_score': match_score,
+            'matching_skills': matches,
+            'missing_skills': missing
+        }
+        
 
