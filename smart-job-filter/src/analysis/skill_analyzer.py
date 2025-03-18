@@ -45,22 +45,22 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
         self.matcher.add("SKILL", skill_patterns)
 
     def extract_skills(self, text: str) -> List[Dict]: # extract skills from the text
-            """Extract skills with context and confidence"""
-            doc = self.nlp(text)
-            skills = []
-            seen = set()
+        """Extract skills with context and confidence"""
+        doc = self.nlp(text)
+        skills = []
+        seen = set()
             
-            # Get skills from pattern matches
-            matches = self.matcher(doc)
-            for match_id, start, end in matches:
-                span = doc[start:end]
-                if span.text not in seen:
-                    skills.append({
-                        'skill': span.text,
-                        'confidence': self._calculate_confidence(span),
-                        'context': self._get_context(span)
-                    })
-                    seen.add(span.text)
+        # Get skills from pattern matches
+        matches = self.matcher(doc)
+        for match_id, start, end in matches:
+            span = doc[start:end]
+            if span.text not in seen:
+                skills.append({
+                    'skill': span.text,
+                    'confidence': self._calculate_confidence(span),
+                    'context': self._get_context(span)
+                })
+                seen.add(span.text)
                     
             # Get skills from noun phrases
             for chunk in doc.noun_chunks:
@@ -122,5 +122,55 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
             'matching_skills': matches,
             'missing_skills': missing
         }
+    
+    def analyze_match(self, resume_text: str, job_description: str) -> Dict:
+        """Comprehensive analysis of resume-job match"""
+        # Get base match score and skills
+        base_match = self.calculate_match_score(resume_text, job_description)
         
+        # Get experience levels
+        doc = self.nlp(resume_text)
+        experience_levels = {}
+        for skill in base_match['matching_skills']:
+            exp = self._extract_experience(doc, skill['skill'])
+            if exp:
+                experience_levels[skill['skill']] = exp
 
+        # Generate detailed recommendations
+        recommendations = []
+        for skill in base_match['missing_skills']:
+            recommendations.append({
+                'skill': skill,
+                'action': f"Consider adding experience in {skill}",
+                'priority': 'high' if any(s['similarity'] > 0.7 for s in base_match['matching_skills']) else 'medium'
+            })
+        
+        # Calculate detailed scores
+        skill_match_score = len(base_match['matching_skills']) / (len(base_match['matching_skills']) + len(base_match['missing_skills']))
+        experience_score = sum(exp.get('years', 0) for exp in experience_levels.values()) / len(experience_levels) if experience_levels else 0
+        
+        return {
+            'match_score': base_match['match_score'],
+            'skill_match_score': skill_match_score,
+            'experience_score': experience_score,
+            'matching_skills': base_match['matching_skills'],
+            'missing_skills': base_match['missing_skills'],
+            'experience_levels': experience_levels,
+            'recommendations': recommendations
+        }
+
+    def _extract_experience(self, doc, skill: str) -> Dict: # extract experience details for a skill
+        """Extract experience details for a skill"""
+        for sent in doc.sents:
+            if skill.lower() in sent.text.lower():
+                years = None
+                for token in sent:
+                    if token.like_num and "year" in sent.text.lower():
+                        years = int(token.text)
+                        return {
+                            'years': years,
+                            'context': sent.text,
+                            'level': 'senior' if years > 5 else 'mid' if years > 2 else 'junior'
+                        }
+        return None
+        

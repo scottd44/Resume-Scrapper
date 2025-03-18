@@ -110,7 +110,7 @@ class JobScraper:
             return None
         
 
-"""    
+   
 if __name__ == "__main__": # used to test scrapper
     # Initialize scraper
     scraper = JobScraper()
@@ -139,4 +139,3 @@ if __name__ == "__main__": # used to test scrapper
     finally:
         # Ensure browser is closed
         scraper.driver.quit()
-        """
