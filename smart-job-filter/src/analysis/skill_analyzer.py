@@ -1,9 +1,6 @@
-from sklearn.feature_extraction.text import TfidfVectorizer #this is used for text vectorization
-from spacy.matcher import Matcher #this is used for pattern matching in NLP
-import re # this is for regular expressions that will be used for text cleaning
 import spacy
-from typing import List, Dict, set
-import string
+from spacy.matcher import Matcher
+from typing import List, Dict, Set
 
 class SkillAnalyzer: # This class is used to analyze skills from resumes and job descriptions
     def __init__(self):
@@ -62,17 +59,17 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
                 })
                 seen.add(span.text)
                     
-            # Get skills from noun phrases
-            for chunk in doc.noun_chunks:
-                if chunk.text not in seen and self._is_likely_skill(chunk):
-                    skills.append({
-                        'skill': chunk.text,
-                        'confidence': self._calculate_confidence(chunk),
-                        'context': self._get_context(chunk)
-                    })
-                    seen.add(chunk.text)
+        # Get skills from noun phrases
+        for chunk in doc.noun_chunks:
+            if chunk.text not in seen and self._is_likely_skill(chunk):
+                skills.append({
+                    'skill': chunk.text,
+                    'confidence': self._calculate_confidence(chunk),
+                    'context': self._get_context(chunk)
+                })
+                seen.add(chunk.text)
                     
-            return skills        
+        return skills        
     def _calculate_confidence(self, span) -> float:
         """Calculate confidence score for extracted skill"""
         score = 0.5  # Base confidence
@@ -125,39 +122,83 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
     
     def analyze_match(self, resume_text: str, job_description: str) -> Dict:
         """Comprehensive analysis of resume-job match"""
-        # Get base match score and skills
+        if not self.validate_input(resume_text) or not self.validate_input(job_description):
+            raise ValueError("Invalid input text")
+            
         base_match = self.calculate_match_score(resume_text, job_description)
-        
-        # Get experience levels
         doc = self.nlp(resume_text)
+        
         experience_levels = {}
         for skill in base_match['matching_skills']:
             exp = self._extract_experience(doc, skill['skill'])
             if exp:
                 experience_levels[skill['skill']] = exp
-
-        # Generate detailed recommendations
-        recommendations = []
-        for skill in base_match['missing_skills']:
-            recommendations.append({
-                'skill': skill,
-                'action': f"Consider adding experience in {skill}",
-                'priority': 'high' if any(s['similarity'] > 0.7 for s in base_match['matching_skills']) else 'medium'
-            })
-        
-        # Calculate detailed scores
-        skill_match_score = len(base_match['matching_skills']) / (len(base_match['matching_skills']) + len(base_match['missing_skills']))
-        experience_score = sum(exp.get('years', 0) for exp in experience_levels.values()) / len(experience_levels) if experience_levels else 0
+                
+        education = self.extract_education(doc)
+        industry = self.identify_industry(job_description)
+        detailed_recommendations = self.get_detailed_recommendations(
+            base_match['missing_skills'], 
+            experience_levels
+        )
         
         return {
-            'match_score': base_match['match_score'],
-            'skill_match_score': skill_match_score,
-            'experience_score': experience_score,
-            'matching_skills': base_match['matching_skills'],
-            'missing_skills': base_match['missing_skills'],
+            **base_match,
+            'education': education,
+            'industry': industry,
             'experience_levels': experience_levels,
-            'recommendations': recommendations
+            'detailed_recommendations': detailed_recommendations
         }
+    
+    def validate_input(self, text: str) -> bool:
+        """Validate if input text is processable"""
+        if not text or len(text.strip()) < 10:
+            return False
+        return True
+
+    def extract_education(self, doc) -> List[Dict]:
+        """Extract education details from text"""
+        education = []
+        edu_keywords = ["degree", "bachelor", "master", "phd", "certification"]
+        
+        for sent in doc.sents:
+            if any(keyword in sent.text.lower() for keyword in edu_keywords):
+                education.append({
+                    'qualification': sent.text,
+                    'context': self._get_context(sent)
+                })
+        return education
+
+    def identify_industry(self, text: str) -> str:
+        """Identify primary industry from job description"""
+        doc = self.nlp(text.lower())
+        # Add industry recognition logic
+        return "technology"  # Default for now
+
+    def get_detailed_recommendations(self, missing_skills: List[str], 
+                                experience_levels: Dict) -> List[Dict]:
+        """Generate detailed improvement recommendations"""
+        recommendations = []
+        
+        # Skill recommendations
+        for skill in missing_skills:
+            recommendations.append({
+                'type': 'skill_gap',
+                'skill': skill,
+                'action': f"Add {skill} to your skillset",
+                'priority': 'high'
+            })
+        
+        # Experience recommendations
+        for skill, exp in experience_levels.items():
+            if exp['years'] < 2:
+                recommendations.append({
+                    'type': 'experience_gap',
+                    'skill': skill,
+                    'action': f"Gain more experience with {skill}",
+                    'priority': 'medium'
+                })
+        
+        return recommendations
 
     def _extract_experience(self, doc, skill: str) -> Dict: # extract experience details for a skill
         """Extract experience details for a skill"""
@@ -174,3 +215,63 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
                         }
         return None
         
+    def _get_context(self, span) -> str:
+        """Get surrounding context of skill mention"""
+        sent = span.sent
+        return sent.text if sent else span.text
+    
+    def _is_likely_skill(self, span) -> bool:
+        """Determine if span is likely to be a skill
+        
+        Args:
+            span: spaCy Span object to analyze
+            
+        Returns:
+            bool: True if likely a skill, False otherwise
+        """
+        return (
+            # Check for proper nouns (Python, JavaScript, etc)
+            not span.text.islower() or
+            
+            # Check for technical terms via part of speech
+            any(token.pos_ in ["NOUN", "PROPN"] for token in span) or
+            
+            # Check for product/organization names
+            any(token.ent_type_ in ["PRODUCT", "ORG"] for token in span) or
+            
+            # Check for compound technical terms
+            len(span) > 1 and span.root.pos_ == "NOUN"
+        )
+    
+    def main(self):
+        """Test the skill analyzer with sample data"""
+        # Test data
+        resume = """
+        Senior Python developer with 5 years experience in web development.
+        Proficient in Django, React, and AWS cloud services.
+        Led multiple teams and implemented CI/CD pipelines.
+        Bachelor's degree in Computer Science.
+        """
+        
+        job = """
+        Senior Python developer with 5 years experience in web development.
+        Proficient in Django, React, and AWS cloud services.
+        Led multiple teams and implemented CI/CD pipelines.
+        Bachelor's degree in Computer Science.
+        """
+        
+        # Test skill extraction
+        print("\nExtracting skills from resume...")
+        resume_skills = self.extract_skills(resume)
+        for skill in resume_skills:
+            print(f"Found skill: {skill['skill']} (confidence: {skill['confidence']:.2f})")
+        
+        # Test match calculation
+        print("\nCalculating job match...")
+        match = self.calculate_match_score(resume, job)
+        print(f"Match score: {match['match_score']:.2%}")
+        print("\nMatching skills:", [s['skill'] for s in match['matching_skills']])
+        print("Missing skills:", match['missing_skills'])
+if __name__ == "__main__":
+    analyzer = SkillAnalyzer()
+    analyzer.main()
