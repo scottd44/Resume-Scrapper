@@ -247,17 +247,17 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
         """Test the skill analyzer with sample data"""
         # Test data
         resume = """
-        Senior Python developer with 5 years experience in web development.
-        Proficient in Django, React, and AWS cloud services.
-        Led multiple teams and implemented CI/CD pipelines.
-        Bachelor's degree in Computer Science.
+        Junior Java Developer with 1 year of experience in software development.
+        Familiar with Spring Boot and SQL databases.
+        Eager to learn and contribute to innovative projects.
+        Bachelor's degree in Information Technology.
         """
         
         job = """
-        Senior Python developer with 5 years experience in web development.
-        Proficient in Django, React, and AWS cloud services.
-        Led multiple teams and implemented CI/CD pipelines.
-        Bachelor's degree in Computer Science.
+        Looking for an experienced Data Scientist with strong expertise in machine learning and statistical analysis.
+        Must be proficient in Python and have at least 3 years of experience in data modeling.
+        A Master's degree in Data Science or a related field is required.
+        Experience with big data tools and visualization is a plus.
         """
         
         # Test skill extraction
