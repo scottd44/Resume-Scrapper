@@ -63,7 +63,7 @@ class JobScraper:
         
     def _parse_search_results(self, html: str) -> list: # method to parse the search results takes in html which was made in the search_jobs method.
         jobs = []
-        job_cards = self.driver.find_elements(By.CLASS_NAME, "job_seen_beacon") [:10]
+        job_cards = self.driver.find_elements(By.CLASS_NAME, "job_seen_beacon") [:15]
         print(f"Found {len(job_cards)} job cards.")
 
         for index, card in enumerate(job_cards): # Loop through each job card from the search results  
