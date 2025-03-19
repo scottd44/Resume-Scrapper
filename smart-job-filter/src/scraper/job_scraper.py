@@ -63,7 +63,7 @@ class JobScraper:
         
     def _parse_search_results(self, html: str) -> list: # method to parse the search results takes in html which was made in the search_jobs method.
         jobs = []
-        job_cards = self.driver.find_elements(By.CLASS_NAME, "job_seen_beacon")
+        job_cards = self.driver.find_elements(By.CLASS_NAME, "job_seen_beacon") [:10]
         print(f"Found {len(job_cards)} job cards.")
 
         for index, card in enumerate(job_cards): # Loop through each job card from the search results  
@@ -109,33 +109,3 @@ class JobScraper:
             print(f"Error getting job details: {e}")
             return None
         
-
-   
-if __name__ == "__main__": # used to test scrapper
-    # Initialize scraper
-    scraper = JobScraper()
-    
-    try:
-        # Test the scraper
-        print("Testing job scraper...")
-        print("Searching for Java developer jobs...")
-        
-        # Search for jobs
-        jobs = scraper.search_jobs("software engineering", "seattle")
-        
-        # Display results
-        print(f"\nFound {len(jobs)} jobs:")
-        for job in jobs:
-            print("\n" + "="*50)
-            print(f"Title: {job['title']}\n")
-            print(f"Company: {job['company']}\n")
-            print(f"Location: {job['location']}\n")
-            print(f"URL: {job['url']}\n")
-            print(f"Description: {job['description']}")
-            print("="*50)
-            
-    except Exception as e:
-        print(f"Error running scraper: {e}")
-    finally:
-        # Ensure browser is closed
-        scraper.driver.quit()

@@ -1,6 +1,10 @@
 import spacy
 from spacy.matcher import Matcher
 from typing import List, Dict, Set
+from spacy.lang.en.stop_words import STOP_WORDS
+import string
+
+
 
 class SkillAnalyzer: # This class is used to analyze skills from resumes and job descriptions
     def __init__(self):
@@ -9,6 +13,15 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
         self.nlp = spacy.load("en_core_web_lg")
         self.matcher = Matcher(self.nlp.vocab)
         self._setup_skill_patterns()
+
+        self.tech_skills = {
+            'languages': {'python', 'java', 'javascript', 'c++', 'typescript', 'ruby', 'swift', 'golang', 'scala'},
+            'web': {'html', 'css', 'react', 'angular', 'vue', 'nodejs', 'django', 'flask', 'typescript'},
+            'data': {'sql', 'mongodb', 'postgresql', 'mysql', 'redis', 'bigquery', 'pandas', 'numpy'},
+            'cloud': {'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'cloudrun'},
+            'ai_ml': {'machine learning', 'artificial intelligence', 'tensorflow', 'pytorch', 'nlp', 'sklearn'},
+            'tools': {'git', 'jenkins', 'jira', 'hackerrank'}
+        }
 
     def _setup_skill_patterns(self): # define patterns for skill extraction
         """Define linguistic patterns that indicate skills"""
@@ -46,79 +59,105 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
         doc = self.nlp(text)
         skills = []
         seen = set()
-            
-        # Get skills from pattern matches
+        
+        # Match skill patterns
         matches = self.matcher(doc)
         for match_id, start, end in matches:
             span = doc[start:end]
-            if span.text not in seen:
+            skill = span.text.strip()
+            if skill.lower() not in seen and self._is_likely_skill(span):
                 skills.append({
-                    'skill': span.text,
+                    'skill': skill,
                     'confidence': self._calculate_confidence(span),
                     'context': self._get_context(span)
                 })
-                seen.add(span.text)
-                    
-        # Get skills from noun phrases
-        for chunk in doc.noun_chunks:
-            if chunk.text not in seen and self._is_likely_skill(chunk):
-                skills.append({
-                    'skill': chunk.text,
-                    'confidence': self._calculate_confidence(chunk),
-                    'context': self._get_context(chunk)
-                })
-                seen.add(chunk.text)
-                    
-        return skills        
+                seen.add(skill.lower())
+
+        # Filter and return top skills
+        return self._filter_skills(skills)   
+    
     def _calculate_confidence(self, span) -> float:
-        """Calculate confidence score for extracted skill"""
+        """Improved confidence scoring"""
         score = 0.5  # Base confidence
         
-        # Increase confidence based on context
+        # Check if skill is in our technical skills list
+        if span.text.lower() in {skill.lower() for skills in self.tech_skills.values() 
+                                for skill in skills}:
+            score += 0.3
+            
+        # Other confidence factors
         if any(token.pos_ in ["NOUN", "PROPN"] for token in span):
-            score += 0.2
+            score += 0.1
         if any(token.ent_type_ in ["PRODUCT", "ORG"] for token in span):
-            score += 0.2
-        if len(span) > 1:  # Multi-word skills more likely to be real
             score += 0.1
             
         return min(1.0, score)
 
     
-    def calculate_match_score(self, resume_text: str, job_description: str) -> float:
-        """Calculate detailed match between resume and job"""
+    def calculate_match_score(self, resume_text: str, job_description: str) -> Dict:
+        """Calculate match score between resume and job description"""
         resume_skills = self.extract_skills(resume_text)
         job_skills = self.extract_skills(job_description)
         
         matches = []
         missing = []
-        total_confidence = 0
+        total_score = 0
+        
+        # Define common technical skills
+        tech_skills = {
+            'python', 'java', 'javascript', 'sql', 'html', 'css', 
+            'react', 'docker', 'aws', 'ai', 'machine learning'
+        }
         
         for job_skill in job_skills:
-            matched = False
-            for resume_skill in resume_skills:
-                similarity = self.nlp(job_skill['skill']).similarity(
-                    self.nlp(resume_skill['skill'])
-                )
-                if similarity > 0.8:
-                    matches.append({
-                        'skill': job_skill['skill'],
-                        'confidence': resume_skill['confidence'],
-                        'similarity': similarity
-                    })
-                    matched = True
-                    total_confidence += resume_skill['confidence']
-                    break
-            if not matched:
-                missing.append(job_skill['skill'])
+            skill_name = job_skill['skill'].lower()
+            
+            # Only process if it's a likely technical skill
+            if skill_name in tech_skills or self._is_technical_skill(skill_name):
+                matched = False
+                
+                for resume_skill in resume_skills:
+                    resume_skill_name = resume_skill['skill'].lower()
+                    
+                    # Check for exact or close matches
+                    if (skill_name == resume_skill_name or
+                        skill_name in resume_skill_name or 
+                        resume_skill_name in skill_name):
+                        matches.append({
+                            'skill': job_skill['skill'],
+                            'confidence': resume_skill['confidence']
+                        })
+                        matched = True
+                        total_score += resume_skill['confidence']
+                        break
+                        
+                if not matched:
+                    missing.append(job_skill['skill'])
         
-        match_score = total_confidence / len(job_skills) if job_skills else 0
+        # Calculate final score (0-100)
+        match_score = (len(matches) / (len(matches) + len(missing))) * 100 if matches else 0
         
         return {
-            'match_score': match_score,
+            'match_score': round(match_score, 1),
             'matching_skills': matches,
             'missing_skills': missing
         }
+
+    def _is_technical_skill(self, text: str) -> bool:
+        """Determine if text is likely a technical skill"""
+        # Common words that shouldn't be considered skills
+        non_skills = {
+            'team', 'work', 'role', 'position', 'hour', 'remote',
+            'responsibility', 'qualification', 'benefit', 'progress'
+        }
+        
+        return (
+            text not in non_skills and
+            len(text) > 2 and  # Skip short words
+            not text.startswith('the') and
+            not text.startswith('our') and
+            not text.startswith('your')
+        )
     
     def analyze_match(self, resume_text: str, job_description: str) -> Dict:
         """Comprehensive analysis of resume-job match"""
@@ -221,57 +260,25 @@ class SkillAnalyzer: # This class is used to analyze skills from resumes and job
         return sent.text if sent else span.text
     
     def _is_likely_skill(self, span) -> bool:
-        """Determine if span is likely to be a skill
+        """Improved skill detection"""
+        # Get all technical skills as flat set
+        all_tech_skills = {skill.lower() for category in self.tech_skills.values() 
+                          for skill in category}
         
-        Args:
-            span: spaCy Span object to analyze
-            
-        Returns:
-            bool: True if likely a skill, False otherwise
-        """
+        text = span.text.lower()
         return (
-            # Check for proper nouns (Python, JavaScript, etc)
-            not span.text.islower() or
-            
-            # Check for technical terms via part of speech
-            any(token.pos_ in ["NOUN", "PROPN"] for token in span) or
-            
-            # Check for product/organization names
+            text in all_tech_skills or
+            (not span.text.islower() and len(span.text) > 2) or
             any(token.ent_type_ in ["PRODUCT", "ORG"] for token in span) or
-            
-            # Check for compound technical terms
-            len(span) > 1 and span.root.pos_ == "NOUN"
+            (len(span) > 1 and span.root.pos_ == "NOUN" and
+             not any(word in text for word in ['job', 'work', 'year', 'time']))
         )
     
-    def main(self):
-        """Test the skill analyzer with sample data"""
-        # Test data
-        resume = """
-        Junior Java Developer with 1 year of experience in software development.
-        Familiar with Spring Boot and SQL databases.
-        Eager to learn and contribute to innovative projects.
-        Bachelor's degree in Information Technology.
-        """
+    def _filter_skills(self, skills: List[Dict]) -> List[Dict]:
+        """Filter and limit skills"""
+        # Sort by confidence
+        sorted_skills = sorted(skills, key=lambda x: x['confidence'], reverse=True)
         
-        job = """
-        Looking for an experienced Data Scientist with strong expertise in machine learning and statistical analysis.
-        Must be proficient in Python and have at least 3 years of experience in data modeling.
-        A Master's degree in Data Science or a related field is required.
-        Experience with big data tools and visualization is a plus.
-        """
-        
-        # Test skill extraction
-        print("\nExtracting skills from resume...")
-        resume_skills = self.extract_skills(resume)
-        for skill in resume_skills:
-            print(f"Found skill: {skill['skill']} (confidence: {skill['confidence']:.2f})")
-        
-        # Test match calculation
-        print("\nCalculating job match...")
-        match = self.calculate_match_score(resume, job)
-        print(f"Match score: {match['match_score']:.2%}")
-        print("\nMatching skills:", [s['skill'] for s in match['matching_skills']])
-        print("Missing skills:", match['missing_skills'])
-if __name__ == "__main__":
-    analyzer = SkillAnalyzer()
-    analyzer.main()
+        # Take top 10 skills
+        return sorted_skills[:10]
+    
