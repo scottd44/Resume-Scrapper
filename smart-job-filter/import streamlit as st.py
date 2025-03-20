@@ -55,8 +55,8 @@ def run_webapp():
             """)
         with col2:
             st.image("https://cdn-icons-png.flaticon.com/512/3135/3135811.png", width=200)
-
-        # Process when search button is clicked
+    
+    # Process when search button is clicked
     if uploaded_file and search_button:
         # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
@@ -115,8 +115,8 @@ def run_webapp():
                 }
                 analyzed_jobs.append(analyzed_job)
                 progress_bar.progress(60 + (i+1) * 30 // len(jobs[:num_jobs]))
-                
-                # Step 6: Sort and display results
+            
+            # Step 6: Sort and display results
             status_text.text("Sorting and preparing results...")
             analyzed_jobs.sort(key=lambda x: x['match_score'], reverse=True)
             progress_bar.progress(100)
