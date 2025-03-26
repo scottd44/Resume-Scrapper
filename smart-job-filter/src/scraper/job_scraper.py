@@ -45,7 +45,7 @@ class JobScraper:
         search_url = f"{self.base_url}/jobs?q={job_title}&l={location}" # This allows the user to input their desired job type and location. it will then be searched for on job site
         try:
             self.driver.get(search_url)
-            time.sleep(random.uniform(2,4))  # Wait for JavaScript content for 3-6 seconds to load (randomized to mimic human behavior)
+            time.sleep(random.uniform(2,3))  # Wait for JavaScript content for 3-6 seconds to load (randomized to mimic human behavior)
 
             if "Just a moment" in self.driver.title:
                 print("CloudFlare detected - waiting...")
@@ -86,7 +86,7 @@ class JobScraper:
             )
             self.driver.execute_script("arguments[0].click();", title_element)
 
-            time.sleep(random.uniform(.75,1))  # Wait for the job description to load
+            time.sleep(random.uniform(.75,.85))  # Wait for the job description to load
 
             # Get full job description
             full_description = []

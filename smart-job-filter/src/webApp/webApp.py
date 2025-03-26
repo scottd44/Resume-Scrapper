@@ -275,6 +275,15 @@ def run_webapp():
                     with cols[1]:
                         # Create two columns for matching and missing skills
                         skill_cols = st.columns(2)
+
+                        st.markdown("""
+                        <style>
+                        h3 {
+                            margin-top: 0;
+                            padding-top: 0;
+                        }
+                        </style>
+                        """, unsafe_allow_html=True)
                         
                         # Matching skills with visual improvements
                         with skill_cols[0]:
