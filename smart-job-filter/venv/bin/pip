@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/Users/scottdunlap/Desktop/CS 1331 Unit 3 Code examples/Resume Scrapper/smart-job-filter/venv/bin/python3.12" "$0" "$@"
+'''exec' "/Users/scottdunlap/Desktop/Resume Scrapper/smart-job-filter/venv/bin/python3.12" "$0" "$@"
 ' '''
 # -*- coding: utf-8 -*-
 import re

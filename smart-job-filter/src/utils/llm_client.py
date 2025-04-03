@@ -29,28 +29,32 @@ class OllamaClient:
         ONLY return the formatted cover letter without any additional instructions or explanations.
         """
         
+        cover_letter = self.generate_text(prompt)
+        
+        # Ensure it starts with a proper greeting
+        if not any(cover_letter.startswith(greeting) for greeting in ["Dear ", "To "]):
+            cover_letter = "Dear Hiring Manager,\n\n" + cover_letter
+        
+        return cover_letter
+
+    def generate_text(self, prompt, model="deepseek-llm:7b", temperature=0.7, max_tokens=2048):
+        """Generate text using Ollama with a custom prompt"""
         try:
             response = requests.post(
                 f"{self.base_url}/api/generate",
                 json={
-                    "model": "deepseek-r1:8b",
+                    "model": model,
                     "prompt": prompt,
                     "stream": False,
-                    "temperature": 0.7,
-                    "max_tokens": 2048
+                    "temperature": temperature,
+                    "max_tokens": max_tokens
                 },
                 timeout=120
             )
             
             if response.status_code == 200:
                 result = response.json()
-                cover_letter = result.get("response", "").strip()
-                
-                # Ensure it starts with a proper greeting
-                if not any(cover_letter.startswith(greeting) for greeting in ["Dear ", "To "]):
-                    cover_letter = "Dear Hiring Manager,\n\n" + cover_letter
-                
-                return cover_letter
+                return result.get("response", "").strip()
             else:
                 return f"Error: {response.status_code} - {response.text}"
                 

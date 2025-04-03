@@ -51,7 +51,59 @@ def generate_cover_letter(job_index):
                 
             except Exception as e:
                 st.error(f"Error generating cover letter: {str(e)}")
-                st.info("Make sure DeepSeek model is downloaded. Run 'ollama pull deepseek-r1:8b' in terminal.")
+                st.info("Make sure DeepSeek model is downloaded.")
+                return
+
+def generate_enhanced_resume(job_index):
+    """Generate an enhanced resume for a specific job by incorporating missing skills"""
+    if f"enhanced_resume_{job_index}" not in st.session_state:
+        job = st.session_state.analyzed_jobs[job_index]
+        
+        with st.spinner("Generating your enhanced resume... This may take 30-60 seconds."):
+            try:
+                # Initialize the Ollama client
+                llm_client = OllamaClient()
+                
+                # Get the missing skills as a formatted string
+                missing_skills = ", ".join(job['missing_skills']) if job['missing_skills'] else "None"
+                
+                # Prepare the prompt for resume enhancement
+                prompt = f"""
+                Enhance the following resume to better match a {job['title']} position at {job['company']}.
+                
+                # ORIGINAL RESUME
+                {st.session_state.resume_text}
+                
+                # JOB DESCRIPTION
+                {job['description']}
+                
+                # MISSING SKILLS TO INCORPORATE
+                {missing_skills}
+                
+                Enhance this resume by:
+                1. Emphasizing existing skills that match the job requirements
+                2. Adding relevant missing skills where the candidate might have experience but didn't mention it
+                3. Restructuring content to highlight most relevant experience first
+                4. Using industry-specific keywords from the job description
+                5. Maintaining the same general format and sections
+                
+                Return only the enhanced resume text in a professional format.
+                """
+                
+                # Generate the enhanced resume
+                enhanced_resume = llm_client.generate_text(
+                    prompt=prompt,
+                    model="deepseek-llm:7b",
+                    temperature=0.7,
+                    max_tokens=2048
+                )
+                
+                # Store in session state
+                st.session_state[f"enhanced_resume_{job_index}"] = enhanced_resume
+                
+            except Exception as e:
+                st.error(f"Error generating enhanced resume: {str(e)}")
+                st.info("Make sure DeepSeek model is downloaded.")
                 return
 
 def run_webapp():
@@ -269,6 +321,43 @@ def run_webapp():
                                 label="Download Cover Letter",
                                 data=st.session_state.cover_letters[i],
                                 file_name=f"Cover_Letter_{job['company'].replace(' ', '_')}.txt", 
+                                mime="text/plain"
+                            )
+
+                        # Add Enhanced Resume Button
+                        if st.button("Create Enhanced Resume", key=f"btn_resume_{i}"):
+                            generate_enhanced_resume(i)
+
+                        # Display enhanced resume if it exists
+                        if f"enhanced_resume_{i}" in st.session_state:
+                            st.success("Enhanced resume generated!")
+                            
+                            # Display in a nice format with better visibility
+                            st.markdown(
+                                f"""
+                                <div style="
+                                    background-color: white;
+                                    padding: 25px;
+                                    border-radius: 10px;
+                                    border: 1px solid #ddd;
+                                    font-family: 'Courier New', monospace;
+                                    font-size: 14px;
+                                    line-height: 1.6;
+                                    color: #000000;
+                                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                                    white-space: pre-line;
+                                ">
+                                {st.session_state[f"enhanced_resume_{i}"]}
+                                </div>
+                                """, 
+                                unsafe_allow_html=True
+                            )
+                            
+                            # Add download button
+                            st.download_button(
+                                label="Download Enhanced Resume",
+                                data=st.session_state[f"enhanced_resume_{i}"],
+                                file_name=f"Enhanced_Resume_{job['company'].replace(' ', '_')}.txt", 
                                 mime="text/plain"
                             )
                     
